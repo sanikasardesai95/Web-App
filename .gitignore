@@ -1,0 +1,9 @@
+# Ignore log files
+*.log
+
+# Ignore database files
+*.db
+
+# Ignore IDE settings
+.vscode/
+.idea/
