@@ -7,14 +7,14 @@ import os
 app = Flask(__name__)
 
 # Configure the SQLAlchemy part of the app instance
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///C:/Users/sanik/Desktop/Web-App_Assignment/data.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the database
 db = SQLAlchemy(app)
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging to a file
+logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Define a model for the data
 class Contact(db.Model):
@@ -24,13 +24,28 @@ class Contact(db.Model):
     phone = db.Column(db.String(20), nullable=False)
     message = db.Column(db.Text, nullable=False)
 
-# Ensure the database file exists
-if not os.path.exists('data.db'):
-    db.create_all()
+# Ensure the database file exists and initialize tables
+if not os.path.exists('C:/Users/sanik/Desktop/Web-App_Assignment/data.db'):
+    with app.app_context():
+        db.create_all()
+
+@app.route('/initialize_db')
+def initialize_db():
+    try:
+        # Ensure the tables are created
+        with app.app_context():
+            db.create_all()
+        return jsonify({"message": "Database initialized successfully!"}), 200
+    except Exception as e:
+        logging.error(f'Error initializing the database: {e}')
+        return jsonify({"error": f"An error occurred during initialization: {e}"}), 500
 
 @app.route('/submit', methods=['POST'])
 def submit_form():
     try:
+        # Log the request
+        logging.info('Received form submission request')
+
         # Get data from the form
         data = request.get_json()
         name = data.get('name')
@@ -40,7 +55,7 @@ def submit_form():
 
         # Validate data
         if not all([name, email, phone, message]):
-            logging.error('Validation failed: Missing fields')
+            logging.error('Validation failed: Missing field')
             return jsonify({"error": "All fields are required."}), 400
 
         # Insert data into the database
@@ -49,11 +64,36 @@ def submit_form():
         db.session.commit()
         logging.info('Data inserted successfully')
 
-        return jsonify({"message": "Form submitted successfully!"}), 200
+        return jsonify({"message": "Form submitted successfully!"}), 201
 
     except Exception as e:
         logging.error(f'Error processing the form: {e}')
         return jsonify({"error": "An error occurred while processing the form."}), 500
+
+@app.route('/test_db')
+def test_db():
+    try:
+        # Create a test record
+        test_contact = Contact(name="Test User", email="test@example.com", phone="1234567890", message="Hello World!")
+        db.session.add(test_contact)
+        db.session.commit()
+
+        # Retrieve the record
+        retrieved_contact = Contact.query.filter_by(name="Test User").first()
+        
+        if retrieved_contact:
+            return jsonify({
+                "name": retrieved_contact.name,
+                "email": retrieved_contact.email,
+                "phone": retrieved_contact.phone,
+                "message": retrieved_contact.message
+            })
+        else:
+            return jsonify({"error": "Test record not found"}), 404
+        
+    except Exception as e:
+        logging.error(f'Error testing the database: {e}')
+        return jsonify({"error": f"An error occurred: {e}"}), 500
 
 # Start the Flask server
 if __name__ == '__main__':
